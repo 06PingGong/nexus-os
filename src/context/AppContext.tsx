@@ -26,6 +26,8 @@ interface AppContextType {
   addTask: (text: string, category?: string, priority?: string) => Promise<void>;
   addJournal: (content: string, tags?: string[]) => Promise<void>;
   loading: boolean;
+  isAuthenticated: boolean;
+  login: (pwd: string) => boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -34,11 +36,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   
   // 检查是否配置了真实的 Supabase
-  const isSupabaseReady = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== 'your_anon_key_here';
+  const isSupabaseReady = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== 'your_anon_key_here';
 
   useEffect(() => {
+    // 检查本地登录状态
+    const auth = localStorage.getItem('nexus_auth');
+    if (auth === 'true') setIsAuthenticated(true);
     const loadData = async () => {
       setLoading(true);
       if (isSupabaseReady) {
@@ -97,12 +103,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const login = (pwd: string) => {
+    if (pwd === '888888') { // 这里设置您的门禁密码
+      setIsAuthenticated(true);
+      localStorage.setItem('nexus_auth', 'true');
+      return true;
+    }
+    return false;
+  };
+
   return (
     <AppContext.Provider value={{ 
       tasks, setTasks, 
       journalEntries, setJournalEntries,
       addTask, addJournal,
-      loading
+      loading,
+      isAuthenticated,
+      login
     }}>
       {children}
     </AppContext.Provider>
