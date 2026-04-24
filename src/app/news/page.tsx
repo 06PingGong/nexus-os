@@ -1,349 +1,176 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Globe, 
-  Search, 
-  Clock, 
   Newspaper, 
-  ChevronRight,
-  TrendingUp,
-  Cpu,
-  Gavel,
+  Search, 
+  Cpu, 
+  Globe, 
+  Gavel, 
   Flag,
+  Clock,
+  RefreshCw,
+  ExternalLink,
   Loader2,
-  RefreshCw
+  ChevronRight
 } from 'lucide-react';
 
+const CATEGORIES = [
+  { id: '科技', icon: <Cpu size={18} />, color: '#3b82f6' },
+  { id: '国内时政', icon: <Flag size={18} />, color: '#ef4444' },
+  { id: '法律', icon: <Gavel size={18} />, color: '#18181b' },
+  { id: '国际实事', icon: <Globe size={18} />, color: '#10b981' }
+];
+
 const NewsPage = () => {
-  const [activeCategory, setActiveCategory] = useState('科技');
-  const [timeFilter, setTimeFilter] = useState('当天');
-  const [newsList, setNewsList] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState('科技');
+  const [news, setNews] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const categories = [
-    { name: '科技', icon: Cpu, rss: 'https://www.ifanr.com/feed' },
-    { name: '国内时政', icon: Flag, rss: 'https://news.un.org/feed/subscribe/zh/news/all/rss.xml' },
-    { name: '法律', icon: Gavel, rss: 'https://www.chinacourt.org/article/index/id/MzAwNEA000MCAA%3D%3D.shtml' }, // 模拟
-    { name: '国际实事', icon: Globe, rss: 'https://news.un.org/feed/subscribe/zh/news/all/rss.xml' },
-  ];
-
-  const fetchRealNews = async (catName: string) => {
+  const fetchNews = async (cat: string) => {
     setLoading(true);
     try {
-      const category = categories.find(c => c.name === catName);
-      // 使用 rss2json 免费代理 (无需 Key)
-      const rssUrl = category?.rss || 'https://news.un.org/feed/subscribe/zh/news/all/rss.xml';
-      const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`);
+      const response = await fetch(`/api/news?cat=${cat}`);
       const data = await response.json();
-      
-      if (data.items) {
-        const results = data.items.map((item: any) => ({
-          id: item.guid || Math.random(),
-          title: item.title,
-          source: item.author || catName,
-          date: item.pubDate.split(' ')[0],
-          time: item.pubDate.split(' ')[1],
-          link: item.link
-        }));
-        setNewsList(results);
-      }
+      setNews(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Fetch news failed:", error);
-      // 如果 API 失败，提供一些高质量 Mock 数据
-      setNewsList([
-        { id: 1, title: 'DeepSeek-V3 全球性能评测报告出炉', source: '科技观察', date: '今天', time: '10:00', link: '#' },
-        { id: 2, title: '最高法发布《数字经济法律保障蓝皮书》', source: '法治网', date: '今天', time: '09:30', link: '#' }
-      ]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchRealNews(activeCategory);
-  }, [activeCategory]);
+    fetchNews(activeTab);
+  }, [activeTab]);
 
   return (
     <div className="news-page">
       <header className="page-header">
-        <div className="header-title">
+        <div className="title-area">
           <Newspaper size={28} className="title-icon" />
           <h1>新闻中心</h1>
         </div>
-        <div className="api-status-badge">
-          <div className="dot"></div>
+        <div className="conn-status">
+          <div className="status-dot pulse"></div>
           实时连接中
         </div>
       </header>
 
-      <div className="news-layout">
-        <aside className="news-sidebar">
-          <div className="filter-group glass-card">
+      <div className="page-layout">
+        <aside className="sidebar">
+          <div className="section-card glass-card">
             <h3>板块</h3>
-            <div className="category-list">
-              {categories.map(cat => {
-                const Icon = cat.icon;
-                return (
-                  <button 
-                    key={cat.name} 
-                    className={`cat-item ${activeCategory === cat.name ? 'active' : ''}`}
-                    onClick={() => setActiveCategory(cat.name)}
-                  >
-                    <Icon size={18} />
-                    <span>{cat.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="filter-group glass-card">
-            <h3>时间</h3>
-            <div className="time-list">
-              {['当天', '近一周', '近一个月'].map(t => (
+            <div className="nav-list">
+              {CATEGORIES.map(cat => (
                 <button 
-                  key={t} 
-                  className={`time-item ${timeFilter === t ? 'active' : ''}`}
-                  onClick={() => setTimeFilter(t)}
+                  key={cat.id}
+                  className={`nav-item ${activeTab === cat.id ? 'active' : ''}`}
+                  onClick={() => setActiveTab(cat.id)}
                 >
-                  {t}
+                  <span className="icon" style={{ color: activeTab === cat.id ? '#fff' : cat.color }}>
+                    {cat.icon}
+                  </span>
+                  {cat.id}
                 </button>
               ))}
             </div>
           </div>
 
-          <button className="refresh-btn glass-card" onClick={() => fetchRealNews(activeCategory)}>
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            刷新资讯
+          <button className="refresh-btn glass-card" onClick={() => fetchNews(activeTab)}>
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> 刷新资讯流
           </button>
         </aside>
 
-        <main className="news-main">
-          <div className="main-header">
-            <h2>{activeCategory} · 实时快讯</h2>
-            <div className="sort-info">显示最新 10 条</div>
+        <main className="content-area">
+          <div className="list-header">
+            <h2>{activeTab} · 实时快讯</h2>
+            <span className="meta">显示最新 {news.length} 条</span>
           </div>
 
-          <div className="news-list">
-            {loading ? (
-              <div className="loading-state">
-                <Loader2 className="animate-spin" size={32} />
-                <p>正在同步全球实时资讯...</p>
-              </div>
-            ) : newsList.length > 0 ? newsList.map(news => (
-              <div key={news.id} className="news-card glass-card" onClick={() => window.open(news.link, '_blank')}>
-                <div className="news-info">
-                  <div className="news-meta">
-                    <span className="source">{news.source}</span>
-                    <span className="time"><Clock size={12} /> {news.date} {news.time}</span>
+          {loading ? (
+            <div className="loading-state">
+              <Loader2 className="animate-spin" size={32} />
+              <p>正在从全球资讯网同步最新动态...</p>
+            </div>
+          ) : (
+            <div className="news-list">
+              {news.map((item, i) => (
+                <div key={i} className="news-card glass-card" onClick={() => window.open(item.link, '_blank')}>
+                  <div className="card-info">
+                    <div className="card-meta">
+                      <span className="cat-tag" style={{ 
+                        background: CATEGORIES.find(c => c.id === activeTab)?.color + '15',
+                        color: CATEGORIES.find(c => c.id === activeTab)?.color
+                      }}>
+                        {activeTab}
+                      </span>
+                      <span className="time">
+                        <Clock size={12} /> {item.date?.split(' ')[0] || '刚刚'}
+                      </span>
+                      <span className="source">{item.source}</span>
+                    </div>
+                    <h3>{item.title}</h3>
                   </div>
-                  <h3>{news.title}</h3>
+                  <div className="card-arrow">
+                    <ChevronRight size={20} />
+                  </div>
                 </div>
-                <ChevronRight size={20} className="arrow-icon" />
-              </div>
-            )) : (
-              <div className="empty-state">
-                <p>暂无最新资讯，请尝试刷新。</p>
-              </div>
-            )}
-          </div>
+              ))}
+              {news.length === 0 && (
+                <div className="empty-state">暂无资讯，请尝试点击刷新。</div>
+              )}
+            </div>
+          )}
         </main>
       </div>
 
       <style jsx>{`
-        .news-page {
-          max-width: 1100px;
-          margin: 0 auto;
-        }
+        .news-page { max-width: 1100px; margin: 0 auto; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem; }
+        .title-area { display: flex; align-items: center; gap: 0.75rem; }
+        .title-area h1 { font-size: 1.75rem; font-weight: 700; color: #18181b; }
+        .title-icon { color: #18181b; }
+        .conn-status { font-size: 0.75rem; font-weight: 700; color: #10b981; display: flex; align-items: center; gap: 0.5rem; background: #ecfdf5; padding: 0.3rem 0.6rem; border-radius: 20px; }
+        .status-dot { width: 6px; height: 6px; background: #10b981; border-radius: 50%; }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
 
-        .page-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 2.5rem;
-        }
+        .page-layout { display: grid; grid-template-columns: 240px 1fr; gap: 2rem; }
+        .sidebar { display: flex; flex-direction: column; gap: 1rem; }
+        .glass-card { background: #ffffff; border: 1px solid #f4f4f5; border-radius: 16px; padding: 1.25rem; }
+        
+        .section-card h3 { font-size: 0.8rem; font-weight: 700; color: #a1a1aa; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .nav-list { display: flex; flex-direction: column; gap: 0.4rem; }
+        .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border: none; background: transparent; border-radius: 10px; font-size: 0.9rem; font-weight: 600; color: #52525b; cursor: pointer; transition: all 0.2s; text-align: left; }
+        .nav-item:hover { background: #f4f4f5; color: #18181b; }
+        .nav-item.active { background: #18181b; color: #ffffff; }
+        .nav-item .icon { display: flex; align-items: center; justify-content: center; width: 24px; }
+        
+        .refresh-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.75rem; font-weight: 700; font-size: 0.9rem; cursor: pointer; border: 1px solid #e4e4e7; transition: all 0.2s; }
+        .refresh-btn:hover { background: #f4f4f5; }
 
-        .header-title {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-        }
+        .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .list-header h2 { font-size: 1.25rem; font-weight: 700; }
+        .meta { font-size: 0.75rem; color: #a1a1aa; font-weight: 600; }
 
-        .header-title h1 {
-          font-size: 1.75rem;
-          font-weight: 700;
-          color: #18181b;
-        }
+        .news-list { display: flex; flex-direction: column; gap: 0.75rem; }
+        .news-card { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; cursor: pointer; transition: all 0.2s; border: 1px solid #f4f4f5; }
+        .news-card:hover { transform: translateX(5px); border-color: #18181b; }
+        
+        .card-meta { display: flex; gap: 1rem; align-items: center; margin-bottom: 0.6rem; }
+        .cat-tag { font-size: 0.65rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; }
+        .time { font-size: 0.75rem; color: #a1a1aa; font-weight: 600; display: flex; align-items: center; gap: 0.3rem; }
+        .source { font-size: 0.75rem; color: #a1a1aa; font-weight: 600; }
+        
+        .card-info h3 { font-size: 1.15rem; font-weight: 700; color: #18181b; line-height: 1.4; }
+        .card-arrow { color: #e4e4e7; }
+        .news-card:hover .card-arrow { color: #18181b; }
 
-        .title-icon {
-          color: #2563eb;
-        }
-
-        .api-status-badge {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          font-size: 0.75rem;
-          color: #10b981;
-          font-weight: 600;
-          background: #ecfdf5;
-          padding: 0.4rem 0.8rem;
-          border-radius: 99px;
-        }
-
-        .dot {
-          width: 6px;
-          height: 6px;
-          background: #10b981;
-          border-radius: 50%;
-          animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-          0% { opacity: 1; }
-          50% { opacity: 0.4; }
-          100% { opacity: 1; }
-        }
-
-        .news-layout {
-          display: grid;
-          grid-template-columns: 240px 1fr;
-          gap: 2rem;
-        }
-
-        .news-sidebar {
-          display: flex;
-          flex-direction: column;
-          gap: 1.25rem;
-        }
-
-        .glass-card {
-          background: #ffffff;
-          border: 1px solid #f4f4f5;
-          padding: 1.25rem;
-          border-radius: 12px;
-        }
-
-        .filter-group h3 {
-          font-size: 0.8rem;
-          font-weight: 700;
-          color: #a1a1aa;
-          margin-bottom: 1rem;
-          text-transform: uppercase;
-        }
-
-        .category-list, .time-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-
-        .cat-item, .time-item {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          padding: 0.6rem 0.75rem;
-          border-radius: 8px;
-          border: none;
-          background: transparent;
-          color: #52525b;
-          cursor: pointer;
-          font-size: 0.9rem;
-          transition: all 0.2s;
-        }
-
-        .cat-item.active, .time-item.active {
-          background: #18181b;
-          color: #ffffff;
-        }
-
-        .refresh-btn {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.75rem;
-          cursor: pointer;
-          font-weight: 600;
-          font-size: 0.9rem;
-          color: #18181b;
-        }
-
-        .main-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 1.5rem;
-        }
-
-        .main-header h2 {
-          font-size: 1.25rem;
-          font-weight: 700;
-        }
-
-        .sort-info {
-          font-size: 0.8rem;
-          color: #a1a1aa;
-        }
-
-        .news-list {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .news-card {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 1.5rem;
-          transition: transform 0.2s, border-color 0.2s;
-        }
-
-        .news-card:hover {
-          transform: translateY(-2px);
-          border-color: #2563eb;
-        }
-
-        .news-meta {
-          display: flex;
-          gap: 1rem;
-          margin-bottom: 0.5rem;
-        }
-
-        .source {
-          font-size: 0.7rem;
-          font-weight: 800;
-          color: #2563eb;
-        }
-
-        .time {
-          font-size: 0.7rem;
-          color: #a1a1aa;
-          display: flex;
-          align-items: center;
-          gap: 0.3rem;
-        }
-
-        .news-card h3 {
-          font-size: 1.1rem;
-          font-weight: 600;
-          line-height: 1.4;
-        }
-
-        .loading-state {
-          padding: 6rem;
-          text-align: center;
-          color: #a1a1aa;
-        }
-
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
+        .loading-state { padding: 8rem 0; text-align: center; color: #a1a1aa; }
+        .animate-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .empty-state { padding: 4rem; text-align: center; color: #a1a1aa; border: 1px dashed #e4e4e7; border-radius: 16px; }
       `}</style>
     </div>
   );
