@@ -27,49 +27,73 @@ const Sidebar = () => {
   ];
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-logo">
-        <div className="logo-icon">N</div>
-        <span className="logo-text">极简系统</span>
-      </div>
+    <>
+      {/* 桌面端侧边栏 */}
+      <aside className="sidebar-container sidebar desktop-sidebar">
+        <div className="sidebar-logo">
+          <div className="logo-icon">N</div>
+          <span className="logo-text">极简系统</span>
+        </div>
 
-      <nav className="sidebar-nav">
-        {menuItems.map((item) => {
+        <nav className="sidebar-nav">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.path;
+            return (
+              <Link 
+                key={item.path} 
+                href={item.path}
+                className={`nav-item ${isActive ? 'active' : ''}`}
+              >
+                <Icon size={18} />
+                <span className="nav-label">{item.name}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="sidebar-footer">
+          <div className="user-profile">
+            <div className="avatar">
+              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="用户" />
+            </div>
+            <div className="user-info">
+              <span className="user-name">Aris 博士</span>
+              <span className="user-role">首席研究员</span>
+            </div>
+          </div>
+          
+          <div className="footer-actions">
+            <button className="footer-btn" title="设置">
+              <Settings size={16} />
+            </button>
+            <button className="footer-btn logout" title="登出">
+              <LogOut size={16} />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* 手机端底部导航 */}
+      <nav className="mobile-nav">
+        {menuItems.slice(0, 4).map((item) => { // 手机端展示核心 4 个功能
           const Icon = item.icon;
           const isActive = pathname === item.path;
           return (
             <Link 
               key={item.path} 
               href={item.path}
-              className={`nav-item ${isActive ? 'active' : ''}`}
+              className={`mobile-nav-item ${isActive ? 'active' : ''}`}
             >
-              <Icon size={18} />
-              <span className="nav-label">{item.name}</span>
+              <Icon size={20} />
+              <span>{item.name.slice(0, 2)}</span>
             </Link>
           );
         })}
       </nav>
-
-      <div className="sidebar-footer">
-        <div className="user-profile">
-          <div className="avatar">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="用户" />
-          </div>
-          <div className="user-info">
-            <span className="user-name">Aris 博士</span>
-            <span className="user-role">首席研究员</span>
-          </div>
-        </div>
-        
-        <div className="footer-actions">
-          <button className="footer-btn" title="设置">
-            <Settings size={16} />
-          </button>
-          <button className="footer-btn logout" title="登出">
-            <LogOut size={16} />
-          </button>
-        </div>
-      </div>
+    </>
+  );
+};
 
       <style jsx>{`
         .sidebar {
