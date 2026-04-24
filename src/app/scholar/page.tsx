@@ -262,6 +262,29 @@ const ScholarHub = () => {
         .loading { padding: 8rem 0; text-align: center; color: #a1a1aa; }
         .animate-spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        @media (max-width: 768px) {
+          .domain-bar {
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 0.5rem;
+          }
+          .domain-tab {
+            flex-shrink: 0;
+          }
+          .hub-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+          }
+          .actions {
+            flex-direction: column;
+          }
+          .item-meta {
+            flex-wrap: wrap;
+          }
+        }
       `}</style>
     </div>
   );

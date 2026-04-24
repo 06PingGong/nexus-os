@@ -171,6 +171,37 @@ const NewsPage = () => {
         .animate-spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .empty-state { padding: 4rem; text-align: center; color: #a1a1aa; border: 1px dashed #e4e4e7; border-radius: 16px; }
+
+        @media (max-width: 768px) {
+          .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+          }
+          .nav-list {
+            flex-direction: row;
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 0.5rem;
+          }
+          .nav-item {
+            flex-shrink: 0;
+            padding: 0.5rem 1rem;
+          }
+          .section-card h3 {
+            display: none; /* 手机端隐藏“板块”两字以节省空间 */
+          }
+          .card-meta {
+            flex-wrap: wrap;
+          }
+          .list-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+          }
+        }
       `}</style>
     </div>
   );
