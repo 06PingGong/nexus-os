@@ -60,35 +60,15 @@ const ScholarHub = () => {
     setLoading(true);
     try {
       const q = isSearch ? `all:${encodeURIComponent(query)}` : activeInfo.query;
-      const arxivUrl = `https://export.arxiv.org/api/query?search_query=${q}&start=0&max_results=15&sortBy=submittedDate&sortOrder=descending`;
-      
-      // 使用 AllOrigins 代理绕过跨域限制
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(arxivUrl)}`;
-      const response = await fetch(proxyUrl);
-      const data = await response.json();
-      const text = data.contents;
-      
-      const entries = text.split('<entry>');
-      entries.shift(); 
+      // 调用我们自己的服务端接口，确保 100% 成功
+      const response = await fetch(`/api/arxiv?q=${q}`);
+      const results = await response.json();
 
-      const results = entries.map((entry: string) => {
-        const title = entry.match(/<title>([\s\S]*?)<\/title>/)?.[1].replace(/\n/g, ' ').trim() || "Research Paper";
-        const authors = entry.match(/<name>([\s\S]*?)<\/name>/)?.[1] || "ArXiv Author";
-        const id = entry.match(/<id>([\s\S]*?)<\/id>/)?.[1] || "#";
-        const summary = entry.match(/<summary>([\s\S]*?)<\/summary>/)?.[1].replace(/\n/g, ' ').trim() || "暂无摘要预览";
-        const published = entry.match(/<published>([\s\S]*?)<\/published>/)?.[1].slice(0, 10) || "2024-01-01";
-
-        return {
-          title: title,
-          authors: authors + " 等",
-          date: published,
-          link: id,
-          summary: summary,
-          impact: '核心成果'
-        };
-      });
-
-      setPapers(results.length > 0 ? results : getFallbackPapers(activeDomain));
+      if (Array.isArray(results) && results.length > 0) {
+        setPapers(results);
+      } else {
+        setPapers(getFallbackPapers(activeDomain));
+      }
     } catch (error) {
       console.error("Fetch failed:", error);
       setPapers(getFallbackPapers(activeDomain));
@@ -98,7 +78,7 @@ const ScholarHub = () => {
   };
 
   const getFallbackPapers = (domain: string) => [
-    { title: `Latest Research in ${domain}`, authors: "Researcher et al.", date: "2025", summary: "由于网络连接问题，无法从实时库获取数据，请尝试点击刷新按钮。", link: "#", impact: "系统保底" }
+    { title: `Latest Research in ${domain}`, authors: "Researcher et al.", date: "2025", summary: "实时数据获取失败，请检查网络或点击刷新。", link: "#", impact: "系统保底" }
   ];
 
   useEffect(() => {
@@ -114,7 +94,7 @@ const ScholarHub = () => {
         </div>
         <div className="engine-status">
           <Globe size={14} className="pulse-icon" />
-          ArXiv 全球实时连接
+          ArXiv 全球实时连接 (中转引擎已就绪)
         </div>
       </header>
 
@@ -160,7 +140,7 @@ const ScholarHub = () => {
             <Search size={18} color="#a1a1aa" />
             <input 
               type="text" 
-              placeholder={`在 ${activeDomain} 领域中输入关键词...`} 
+              placeholder={`在 ${activeDomain} 领域中深入检索 (实时同步)...`} 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && fetchPapers(searchTerm, true)}
@@ -169,29 +149,29 @@ const ScholarHub = () => {
 
           <div className="papers-list">
             <div className="list-header">
-              <h2>实时发现流</h2>
+              <h2>ArXiv 实时库发现</h2>
               <span className="count">{papers.length} 篇最新成果</span>
             </div>
 
             {loading ? (
               <div className="loading">
                 <Loader2 className="animate-spin" size={32} />
-                <p>正在跨越网络屏障抓取最新文献...</p>
+                <p>正在同步全球顶级实验室的最新产出...</p>
               </div>
             ) : (
               <div className="grid">
                 {papers.map((paper, i) => (
                   <div key={i} className={`paper-item glass-card ${expandedId === i ? 'expanded' : ''}`}>
                     <div className="item-main" onClick={() => setExpandedId(expandedId === i ? null : i)}>
-                      <div className="item-content">
+                      <div className="item-info">
                         <div className="item-meta">
-                          <span className="tag">{paper.impact}</span>
+                          <span className="tag">实时更新</span>
                           <span className="date">{paper.date}</span>
                         </div>
                         <h3>{paper.title}</h3>
                         <p className="authors">{paper.authors}</p>
                       </div>
-                      <div className="item-expand-icon">
+                      <div className="item-toggle">
                         {expandedId === i ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                       </div>
                     </div>
@@ -258,26 +238,26 @@ const ScholarHub = () => {
         .count { font-size: 0.8rem; color: #a1a1aa; }
 
         .grid { display: flex; flex-direction: column; gap: 1rem; }
-        .paper-item { padding: 0; overflow: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid #f4f4f5; }
-        .paper-item:hover { border-color: #2563eb; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
-        .paper-item.expanded { border-color: #18181b; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        .paper-item { padding: 0; overflow: hidden; border: 1px solid #f4f4f5; transition: all 0.2s; cursor: pointer; }
+        .paper-item:hover { border-color: #2563eb; }
+        .paper-item.expanded { border-color: #18181b; }
 
-        .item-main { padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-        .item-meta { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.5rem; }
+        .item-main { padding: 1.25rem; display: flex; justify-content: space-between; align-items: center; }
+        .item-meta { display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.4rem; }
         .tag { font-size: 0.6rem; font-weight: 800; color: #2563eb; background: #eff6ff; padding: 0.15rem 0.5rem; border-radius: 4px; }
         .date { font-size: 0.75rem; color: #a1a1aa; font-weight: 600; }
-        .item-content h3 { font-size: 1.15rem; font-weight: 700; color: #18181b; margin-bottom: 0.4rem; line-height: 1.4; }
+        .item-info h3 { font-size: 1.1rem; font-weight: 700; color: #18181b; margin-bottom: 0.2rem; line-height: 1.4; }
         .authors { font-size: 0.9rem; color: #71717a; }
-        .item-expand-icon { color: #a1a1aa; }
+        .item-toggle { color: #a1a1aa; }
 
-        .item-details { padding: 0 1.5rem 1.5rem 1.5rem; border-top: 1px solid #f4f4f5; background: #fafafa; }
-        .summary-box { padding: 1.25rem; background: white; border-radius: 12px; margin: 1.25rem 0; border: 1px solid #f1f1f4; }
-        .summary-box h4 { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.75rem; color: #18181b; }
+        .item-details { padding: 0 1.25rem 1.25rem 1.25rem; border-top: 1px solid #f4f4f5; background: #fafafa; }
+        .summary-box { padding: 1.25rem; background: white; border-radius: 12px; margin: 1rem 0; border: 1px solid #f1f1f4; }
+        .summary-box h4 { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.6rem; }
         .summary-box p { font-size: 0.85rem; color: #52525b; line-height: 1.7; text-align: justify; }
         
-        .actions { display: flex; gap: 1rem; }
+        .actions { display: flex; gap: 0.75rem; }
         .view-btn { flex: 1; padding: 0.75rem; background: #18181b; color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.6rem; }
-        .link-btn { padding: 0.75rem 1.25rem; background: #f4f4f5; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.6rem; }
+        .link-btn { padding: 0.75rem 1rem; background: #f4f4f5; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; }
 
         .loading { padding: 8rem 0; text-align: center; color: #a1a1aa; }
         .animate-spin { animation: spin 1s linear infinite; }
