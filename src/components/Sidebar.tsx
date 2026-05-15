@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -28,112 +29,120 @@ const Sidebar = () => {
 
   return (
     <>
-      {/* 桌面端侧边栏 */}
-      <aside className="sidebar-container sidebar desktop-sidebar">
-        <div className="sidebar-logo">
-          <div className="logo-icon">N</div>
-          <span className="logo-text">极简系统</span>
-        </div>
-
-        <nav className="sidebar-nav">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.path;
-            return (
-              <Link 
-                key={item.path} 
-                href={item.path}
-                className={`nav-item ${isActive ? 'active' : ''}`}
-              >
-                <Icon size={18} />
-                <span className="nav-label">{item.name}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="user-profile">
-            <div className="avatar">
-              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="用户" />
-            </div>
-            <div className="user-info">
-              <span className="user-name">Aris 博士</span>
-              <span className="user-role">首席研究员</span>
-            </div>
+      <aside className="sidebar-container desktop-sidebar">
+        <div className="sidebar-content">
+          <div className="sidebar-logo">
+            <motion.div 
+              className="logo-icon"
+              whileHover={{ scale: 1.1, rotate: 5 }}
+            >
+              N
+            </motion.div>
+            <span className="logo-text">Nexus OS</span>
           </div>
-          
-          <div className="footer-actions">
-            <button className="footer-btn" title="设置">
-              <Settings size={16} />
-            </button>
-            <button className="footer-btn logout" title="登出">
-              <LogOut size={16} />
-            </button>
+
+          <nav className="sidebar-nav">
+            {menuItems.map((item, i) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.path;
+              return (
+                <motion.div
+                  key={item.path}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                >
+                  <Link 
+                    href={item.path}
+                    className={`nav-item ${isActive ? 'active' : ''}`}
+                  >
+                    <div className="icon-wrapper">
+                      <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                    </div>
+                    <span className="nav-label">{item.name}</span>
+                    {isActive && (
+                      <motion.div 
+                        className="active-indicator"
+                        layoutId="activeIndicator"
+                      />
+                    )}
+                  </Link>
+                </motion.div>
+              );
+            })}
+          </nav>
+
+          <div className="sidebar-footer">
+            <div className="user-profile">
+              <div className="avatar">
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="用户" />
+              </div>
+              <div className="user-info">
+                <span className="user-name">Aris 博士</span>
+                <span className="user-role">首席研究员</span>
+              </div>
+            </div>
+            
+            <div className="footer-actions">
+              <button className="footer-btn" title="设置">
+                <Settings size={16} />
+              </button>
+              <button className="footer-btn logout" title="登出">
+                <LogOut size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </aside>
 
-      {/* 手机端底部导航 */}
-      <nav className="mobile-nav">
-        {menuItems.slice(0, 4).map((item) => { // 手机端展示核心 4 个功能
-          const Icon = item.icon;
-          const isActive = pathname === item.path;
-          return (
-            <Link 
-              key={item.path} 
-              href={item.path}
-              className={`mobile-nav-item ${isActive ? 'active' : ''}`}
-            >
-              <Icon size={20} />
-              <span>{item.name.slice(0, 2)}</span>
-            </Link>
-          );
-        })}
-      </nav>
-    </>
-  );
-};
-
       <style jsx>{`
-        .sidebar {
-          width: 240px;
-          background: #ffffff;
-          border-right: 1px solid #f0f0f0;
-          display: flex;
-          flex-direction: column;
-          height: 100vh;
+        .sidebar-container {
+          width: 260px;
+          height: calc(100vh - 2rem);
           position: sticky;
-          top: 0;
-          padding: 1.5rem 0;
+          top: 1rem;
           z-index: 100;
         }
 
+        .sidebar-content {
+          height: 100%;
+          background: rgba(255, 255, 255, 0.6);
+          backdrop-filter: blur(25px);
+          -webkit-backdrop-filter: blur(25px);
+          border: 1px solid rgba(255, 255, 255, 0.5);
+          border-radius: 2rem;
+          padding: 2rem 1rem;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        }
+
         .sidebar-logo {
-          padding: 0 1.5rem;
-          margin-bottom: 2.5rem;
+          padding: 0 1rem;
+          margin-bottom: 3rem;
           display: flex;
           align-items: center;
-          gap: 0.75rem;
+          gap: 1rem;
         }
 
         .logo-icon {
-          width: 28px;
-          height: 28px;
-          background: #18181b;
-          border-radius: 6px;
+          width: 36px;
+          height: 36px;
+          background: var(--primary);
+          border-radius: 10px;
           display: flex;
           align-items: center;
           justify-content: center;
           font-weight: 800;
           color: white;
-          font-size: 1rem;
+          font-size: 1.1rem;
+          box-shadow: 0 4px 12px rgba(0, 113, 227, 0.3);
         }
 
         .logo-text {
-          font-weight: 600;
-          font-size: 1.1rem;
-          color: #18181b;
+          font-weight: 700;
+          font-size: 1.2rem;
+          color: #1d1d1f;
           letter-spacing: -0.5px;
         }
 
@@ -141,56 +150,74 @@ const Sidebar = () => {
           flex: 1;
           display: flex;
           flex-direction: column;
-          gap: 0.75rem;
-          padding: 0 1rem;
+          gap: 0.5rem;
         }
 
         .nav-item {
           display: flex;
           align-items: center;
-          gap: 1.25rem;
-          padding: 0.8rem 1rem;
-          border-radius: 10px;
-          color: #71717a;
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          gap: 1rem;
+          padding: 0.85rem 1rem;
+          border-radius: 12px;
+          color: #86868b;
+          transition: all 0.2s;
           text-decoration: none;
+          position: relative;
         }
 
         .nav-item:hover {
-          background: #f4f4f5;
-          color: #18181b;
+          background: rgba(0, 0, 0, 0.03);
+          color: #1d1d1f;
         }
 
         .nav-item.active {
-          background: #f4f4f5;
-          color: #2563eb;
-          font-weight: 500;
+          color: var(--primary);
+          background: rgba(0, 113, 227, 0.05);
+        }
+
+        .icon-wrapper {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 24px;
+          height: 24px;
         }
 
         .nav-label {
-          font-size: 0.9rem;
+          font-size: 0.95rem;
+          font-weight: 500;
+        }
+
+        .active-indicator {
+          position: absolute;
+          left: 0;
+          width: 3px;
+          height: 20px;
+          background: var(--primary);
+          border-radius: 0 4px 4px 0;
         }
 
         .sidebar-footer {
-          padding: 1rem 0.75rem;
-          border-top: 1px solid #f0f0f0;
+          padding: 1rem 0.5rem 0;
+          border-top: 1px solid rgba(0, 0, 0, 0.05);
           margin-top: auto;
         }
 
         .user-profile {
           display: flex;
           align-items: center;
-          gap: 0.6rem;
-          margin-bottom: 1rem;
+          gap: 0.75rem;
+          margin-bottom: 1.5rem;
           padding: 0 0.5rem;
         }
 
         .avatar {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
+          width: 40px;
+          height: 40px;
+          border-radius: 12px;
           overflow: hidden;
-          background: #f4f4f5;
+          background: #f5f5f7;
+          border: 1px solid rgba(0, 0, 0, 0.05);
         }
 
         .avatar img {
@@ -202,77 +229,49 @@ const Sidebar = () => {
         .user-info {
           display: flex;
           flex-direction: column;
-          line-height: 1.2;
         }
 
         .user-name {
-          font-size: 0.85rem;
+          font-size: 0.9rem;
           font-weight: 600;
-          color: #18181b;
+          color: #1d1d1f;
         }
 
         .user-role {
-          font-size: 0.7rem;
-          color: #a1a1aa;
+          font-size: 0.75rem;
+          color: #86868b;
         }
 
         .footer-actions {
           display: flex;
           gap: 0.5rem;
-          padding: 0 0.5rem;
         }
 
         .footer-btn {
           flex: 1;
-          height: 32px;
-          background: #ffffff;
-          border: 1px solid #e4e4e7;
-          border-radius: 6px;
+          height: 36px;
+          background: rgba(0, 0, 0, 0.03);
+          border: none;
+          border-radius: 10px;
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #71717a;
+          color: #86868b;
           cursor: pointer;
           transition: all 0.2s;
         }
 
         .footer-btn:hover {
-          background: #f4f4f5;
-          color: #18181b;
-          border-color: #d4d4d8;
+          background: rgba(0, 0, 0, 0.06);
+          color: #1d1d1f;
         }
 
-        @media (max-width: 768px) {
-          .sidebar {
-            position: fixed;
-            bottom: 0;
-            top: auto;
-            width: 100%;
-            height: auto;
-            flex-direction: row;
-            padding: 0.5rem;
-            border-right: none;
-            border-top: 1px solid #f0f0f0;
-            justify-content: space-around;
-          }
-
-          .sidebar-logo, .sidebar-footer, .nav-label {
-            display: none;
-          }
-
-          .sidebar-nav {
-            flex-direction: row;
-            width: 100%;
-            justify-content: space-around;
-            padding: 0;
-          }
-
-          .nav-item {
-            padding: 0.5rem;
-          }
+        .footer-btn.logout:hover {
+          background: #fee2e2;
+          color: #ef4444;
         }
       `}</style>
-    </aside>
+    </>
   );
 };
 

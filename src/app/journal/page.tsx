@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 const JournalPage = () => {
-  const { journalEntries, setJournalEntries, addJournal } = useApp();
+  const { journalEntries, addJournal, deleteJournal } = useApp();
   const [entry, setEntry] = useState('');
 
   const handleAddEntry = () => {
@@ -24,7 +24,7 @@ const JournalPage = () => {
   };
 
   const deleteEntry = (id: number) => {
-    setJournalEntries(journalEntries.filter(e => e.id !== id));
+    deleteJournal(id);
   };
 
   return (
