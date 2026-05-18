@@ -4,7 +4,7 @@ const AI_BASE_URL = process.env.AI_BASE_URL || '';
 const AI_API_KEY = process.env.AI_API_KEY || '';
 const AI_MODEL = process.env.AI_MODEL || 'gpt-4o-mini';
 
-type ReaderAction = 'explain' | 'translate' | 'frontier' | 'card' | 'plan';
+type ReaderAction = 'explain' | 'translate' | 'frontier' | 'card' | 'plan' | 'application_insight' | 'tech_tool_update';
 
 const SYSTEM_PROMPTS: Record<ReaderAction, string> = {
   explain: '你是严谨的科研论文精读助手。请用中文输出：核心问题、主要贡献、方法路线、实验结论、局限性、精读建议。避免编造。',
@@ -12,6 +12,8 @@ const SYSTEM_PROMPTS: Record<ReaderAction, string> = {
   frontier: '你是学术前沿分析助手。请严格基于给定论文列表，用中文输出 JSON，不要输出 Markdown。JSON 字段包括：summary:string, trends:string[], hotTerms:string[], activeLevel:string, readingPriority:string, reviewFocus:string。不要编造论文列表外的信息。',
   card: '你是科研精读卡片助手。请严格基于输入论文信息，用中文输出结构化精读卡片：一句话结论、研究问题、方法核心、数据/实验、关键贡献、局限、可借鉴点、适合写入综述的位置。避免编造。',
   plan: '你是科研项目管理助手。请基于论文信息生成可执行计划：精读步骤、复现实验、代码/数据检查、写作输出、后续引用场景。用中文短条目输出。',
+  application_insight: '你是保研/出国申请情报分析助手。基于用户提供的目标院校、研究方向、背景材料等信息，用中文输出 JSON（不要 Markdown）：title:string（情报标题）, keywords:string[](关键准备点), timeline:string(备战时间轴), preparation:string[](核心准备清单), competitive_edges:string[](竞争力亮点), risk_warning:string(需要注意的风险)。严格基于常识，不要编造。',
+  tech_tool_update: '你是技术工具与前沿趋势分析助手。基于用户关注的领域/研究方向/竞赛/求职，用中文输出 JSON（不要 Markdown）：trending_tools:string[](最新值得掌握的工具/框架), benchmarks:string[](新发布的数据集/评测), research_directions:string[](当前热点研究方向), summer_program_insights:string[](与夏令营/竞赛相关的能力需求), implementation_guide:string(如何快速实践这些工具)。基于公开信息，不要编造。',
 };
 
 const repairMojibake = (text: string) => {

@@ -3,12 +3,27 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
-interface Task {
+export interface TaskSubtask {
+  id: number;
+  text: string;
+  done: boolean;
+}
+
+export interface Task {
   id: number;
   text: string;
   category: string;
   priority: string;
   done: boolean;
+  notes?: string;
+  dueDate?: string;
+  view?: 'today' | 'week' | 'later' | 'backlog';
+  linkedPaperTitle?: string;
+  linkedPaperLink?: string;
+  estimatedMinutes?: number;
+  subtasks?: TaskSubtask[];
+  createdAt?: string;
+  completedAt?: string | null;
 }
 
 interface JournalEntry {
@@ -23,7 +38,7 @@ interface AppContextType {
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   journalEntries: JournalEntry[];
   setJournalEntries: React.Dispatch<React.SetStateAction<JournalEntry[]>>;
-  addTask: (text: string, category?: string, priority?: string) => Promise<void>;
+  addTask: (text: string, category?: string, priority?: string, options?: Partial<Omit<Task, 'id' | 'text' | 'category' | 'priority' | 'done'>>) => Promise<void>;
   updateTask: (id: number, changes: Partial<Omit<Task, 'id'>>) => Promise<void>;
   deleteTask: (id: number) => Promise<void>;
   addJournal: (content: string, tags?: string[]) => Promise<void>;
@@ -35,6 +50,38 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+
+const normalizeTask = (task: any): Task => ({
+  id: Number(task.id),
+  text: task.text,
+  category: task.category || '研究',
+  priority: task.priority || '中',
+  done: Boolean(task.done),
+  notes: task.notes || '',
+  dueDate: task.due_date || task.dueDate || '',
+  view: task.view || 'today',
+  linkedPaperTitle: task.linked_paper_title || task.linkedPaperTitle || '',
+  linkedPaperLink: task.linked_paper_link || task.linkedPaperLink || '',
+  estimatedMinutes: Number(task.estimated_minutes || task.estimatedMinutes || 0) || undefined,
+  subtasks: Array.isArray(task.subtasks) ? task.subtasks : [],
+  createdAt: task.created_at || task.createdAt,
+  completedAt: task.completed_at || task.completedAt || null,
+});
+
+const toTaskPayload = (task: Partial<Task>) => ({
+  text: task.text,
+  category: task.category,
+  priority: task.priority,
+  done: task.done,
+  notes: task.notes || '',
+  due_date: task.dueDate || null,
+  view: task.view || 'today',
+  linked_paper_title: task.linkedPaperTitle || null,
+  linked_paper_link: task.linkedPaperLink || null,
+  estimated_minutes: task.estimatedMinutes || 0,
+  subtasks: task.subtasks || [],
+  completed_at: task.completedAt || null,
+});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -53,24 +100,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (tasksError) console.error('加载云端任务失败:', tasksError.message);
     if (journalsError) console.error('加载云端随记失败:', journalsError.message);
-    if (tasksData) setTasks(tasksData);
+    if (tasksData) setTasks(tasksData.map(normalizeTask));
     if (journalsData) setJournalEntries(journalsData);
   }, []);
 
   useEffect(() => {
-    // 检查本地登录状态
-    const auth = localStorage.getItem('nexus_auth');
-    if (auth === 'true') setIsAuthenticated(true);
     const loadData = async () => {
       setLoading(true);
       if (isSupabaseReady) {
         // 从 Supabase 加载网络上的最新数据
         await loadCloudData();
+        localStorage.removeItem('nexus_tasks');
+        localStorage.removeItem('nexus_journal');
       } else {
         // 回退到 LocalStorage
         const savedTasks = localStorage.getItem('nexus_tasks');
         const savedJournal = localStorage.getItem('nexus_journal');
-        if (savedTasks) setTasks(JSON.parse(savedTasks));
+        if (savedTasks) setTasks(JSON.parse(savedTasks).map(normalizeTask));
         if (savedJournal) setJournalEntries(JSON.parse(savedJournal));
       }
       setLoading(false);
@@ -131,19 +177,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const addTask = async (text: string, category = '研究', priority = '中') => {
+  const addTask = async (text: string, category = '研究', priority = '中', options: Partial<Omit<Task, 'id' | 'text' | 'category' | 'priority' | 'done'>> = {}) => {
     if (!text.trim()) return;
-    let task = { id: Date.now(), text, category, priority, done: false };
+    let task: Task = normalizeTask({
+      id: Date.now(),
+      text,
+      category,
+      priority,
+      done: false,
+      ...options,
+      completedAt: null,
+    });
     if (isSupabaseReady) {
-      const { data, error } = await supabase.from('tasks')
-        .insert([{ text, category, priority, done: false }])
+      const fullPayload = toTaskPayload(task);
+      let { data, error } = await supabase.from('tasks')
+        .insert([fullPayload])
         .select();
+      if (error) {
+        const fallback = await supabase.from('tasks')
+          .insert([{ text, category, priority, done: false }])
+          .select();
+        data = fallback.data;
+        error = fallback.error;
+      }
       if (error) {
         console.error('添加云端任务失败:', error.message);
         return;
       }
       if (data && data.length > 0) {
-        task.id = data[0].id;
+        task = normalizeTask({ ...task, ...data[0] });
       }
       setTasks(prev => [task, ...prev.filter(item => item.id !== task.id)]);
       return;
@@ -156,8 +218,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateTask = async (id: number, changes: Partial<Omit<Task, 'id'>>) => {
+    const normalizedChanges = { ...changes };
+    if (normalizedChanges.done === true && !normalizedChanges.completedAt) normalizedChanges.completedAt = new Date().toISOString();
+    if (normalizedChanges.done === false) normalizedChanges.completedAt = null;
+
     if (isSupabaseReady) {
-      const { error } = await supabase.from('tasks').update(changes).eq('id', id);
+      const payload = toTaskPayload(normalizedChanges);
+      let { error } = await supabase.from('tasks').update(payload).eq('id', id);
+      if (error) {
+        const fallback = await supabase.from('tasks').update({
+          text: normalizedChanges.text,
+          category: normalizedChanges.category,
+          priority: normalizedChanges.priority,
+          done: normalizedChanges.done,
+        }).eq('id', id);
+        error = fallback.error;
+      }
       if (error) {
         console.error('更新云端任务失败:', error.message);
         return;
@@ -165,7 +241,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     setTasks(prev => {
-      const updated = prev.map(task => task.id === id ? { ...task, ...changes } : task);
+      const updated = prev.map(task => task.id === id ? normalizeTask({ ...task, ...normalizedChanges, id }) : task);
       if (!isSupabaseReady) localStorage.setItem('nexus_tasks', JSON.stringify(updated));
       return updated;
     });
@@ -206,7 +282,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const login = (pwd: string) => {
     if (pwd === '888888') { // 这里设置您的门禁密码
       setIsAuthenticated(true);
-      localStorage.setItem('nexus_auth', 'true');
       return true;
     }
     return false;

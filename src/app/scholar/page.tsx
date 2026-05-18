@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useApp } from '@/context/AppContext';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import {
@@ -23,6 +24,8 @@ import {
   Star,
   Tags,
   CheckCircle2,
+  Lightbulb,
+  Zap,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -45,6 +48,7 @@ type Paper = {
   tags?: string[];
   priority?: string;
   aiCard?: string;
+  researchPlan?: string;
   personalRating?: number;
 };
 
@@ -115,6 +119,7 @@ const mapLibraryRow = (row: any): Paper => ({
   tags: row.tags || ['待精读'],
   priority: row.priority || '中',
   aiCard: row.ai_card || '',
+  researchPlan: row.research_plan || '',
   personalRating: row.personal_rating || 0,
 });
 
@@ -135,6 +140,7 @@ const mapPaperToLibraryRow = (paper: Paper) => ({
   tags: paper.tags?.length ? paper.tags : ['待精读'],
   priority: paper.priority || '中',
   ai_card: paper.aiCard || '',
+  research_plan: paper.researchPlan || '',
   personal_rating: paper.personalRating || 0,
 });
 
@@ -157,6 +163,9 @@ const ScholarHub = () => {
   const [insightLoading, setInsightLoading] = useState(false);
   const [frontierInsight, setFrontierInsight] = useState<FrontierInsight | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [yearFilter, setYearFilter] = useState('全部');
+  const [qualityFilter, setQualityFilter] = useState('全部');
+  const [sortMode, setSortMode] = useState<'最新' | '高引' | '精读优先'>('精读优先');
   const [libraryFilter, setLibraryFilter] = useState('全部');
   const [library, setLibrary] = useState<Paper[]>([]);
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
@@ -164,9 +173,34 @@ const ScholarHub = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const domain = DOMAIN_INTELLIGENCE[activeDomain];
-  const filteredPapers = searchTerm.trim()
-    ? papers.filter(paper => `${paper.title} ${paper.authors} ${paper.source}`.toLowerCase().includes(searchTerm.toLowerCase()))
-    : papers;
+  const filteredPapers = useMemo(() => {
+    const yearNow = new Date().getFullYear();
+    const ranked = [...papers].filter(paper => {
+      const textMatched = !searchTerm.trim() || `${paper.title} ${paper.authors} ${paper.source} ${paper.summary || ''}`.toLowerCase().includes(searchTerm.toLowerCase());
+      if (!textMatched) return false;
+
+      if (yearFilter !== '全部') {
+        const year = Number(String(paper.date || '').slice(0, 4)) || 0;
+        if (yearFilter === '近1年' && year < yearNow - 1) return false;
+        if (yearFilter === '近3年' && year < yearNow - 3) return false;
+        if (yearFilter === '2021后' && year < 2021) return false;
+      }
+
+      if (qualityFilter === '顶刊/顶会' && !(String(paper.level || '').includes('顶') || (paper.citations || 0) >= 80)) return false;
+      if (qualityFilter === '高引用' && (paper.citations || 0) < 100) return false;
+      if (qualityFilter === '可读PDF' && !getPdfUrl(paper)) return false;
+      if (qualityFilter === '综述' && !(paper.type || '').toLowerCase().includes('review')) return false;
+      return true;
+    });
+
+    return ranked.sort((a, b) => {
+      if (sortMode === '最新') return String(b.date || '').localeCompare(String(a.date || ''));
+      if (sortMode === '高引') return (b.citations || 0) - (a.citations || 0);
+      const aScore = (a.citations || 0) + (String(a.level || '').includes('顶') ? 80 : 0) + (getPdfUrl(a) ? 20 : 0);
+      const bScore = (b.citations || 0) + (String(b.level || '').includes('顶') ? 80 : 0) + (getPdfUrl(b) ? 20 : 0);
+      return bScore - aScore;
+    });
+  }, [papers, searchTerm, yearFilter, qualityFilter, sortMode]);
   const filteredLibrary = library.filter(paper => libraryFilter === '全部' || paper.status === libraryFilter || paper.priority === libraryFilter || paper.tags?.includes(libraryFilter));
 
   useEffect(() => {
@@ -201,7 +235,7 @@ const ScholarHub = () => {
       if (!error && data) {
         const next = data.map(mapLibraryRow);
         setLibrary(next);
-        localStorage.setItem('nexus_library', JSON.stringify(next));
+        localStorage.removeItem('nexus_library');
         return;
       }
       console.error('加载云端精读库失败:', error?.message);
@@ -287,7 +321,7 @@ const ScholarHub = () => {
     if (library.find(p => p.link === paper.link)) return;
     const newList = [{ ...paper, savedAt: new Date().toLocaleDateString() }, ...library];
     setLibrary(newList);
-    localStorage.setItem('nexus_library', JSON.stringify(newList));
+    if (!isSupabaseConfigured) localStorage.setItem('nexus_library', JSON.stringify(newList));
 
     if (isSupabaseConfigured && !paper.link.startsWith('blob:')) {
       const { error } = await supabase.from('reading_library').upsert(mapPaperToLibraryRow(paper), { onConflict: 'link' });
@@ -298,7 +332,7 @@ const ScholarHub = () => {
   const removeFromLibrary = async (paper: Paper) => {
     const next = library.filter(item => item.link !== paper.link);
     setLibrary(next);
-    localStorage.setItem('nexus_library', JSON.stringify(next));
+    if (!isSupabaseConfigured) localStorage.setItem('nexus_library', JSON.stringify(next));
 
     if (isSupabaseConfigured && !paper.link.startsWith('blob:')) {
       const { error } = await supabase.from('reading_library').delete().eq('link', paper.link);
@@ -309,7 +343,7 @@ const ScholarHub = () => {
   const updateLibraryPaper = async (paper: Paper, changes: Partial<Paper>) => {
     const next = library.map(item => item.link === paper.link ? { ...item, ...changes } : item);
     setLibrary(next);
-    localStorage.setItem('nexus_library', JSON.stringify(next));
+    if (!isSupabaseConfigured) localStorage.setItem('nexus_library', JSON.stringify(next));
 
     if (isSupabaseConfigured && !paper.link.startsWith('blob:')) {
       const payload: any = {};
@@ -317,6 +351,7 @@ const ScholarHub = () => {
       if (changes.tags !== undefined) payload.tags = changes.tags;
       if (changes.priority !== undefined) payload.priority = changes.priority;
       if (changes.aiCard !== undefined) payload.ai_card = changes.aiCard;
+      if (changes.researchPlan !== undefined) payload.research_plan = changes.researchPlan;
       if (changes.personalRating !== undefined) payload.personal_rating = changes.personalRating;
       payload.updated_at = new Date().toISOString();
       const { error } = await supabase.from('reading_library').update(payload).eq('link', paper.link);
@@ -325,12 +360,51 @@ const ScholarHub = () => {
   };
 
   const createPaperTasks = async (paper: Paper) => {
-    await addTask(`精读论文：${paper.title}`, '论文', paper.priority || '中');
-    await addTask(`整理精读卡片：${paper.title}`, '写作', '中');
-    await addTask(`提炼可复现实验：${paper.title}`, '实验', '高');
+    await addTask(`精读论文：${paper.title}`, '论文', paper.priority || '中', {
+      view: 'today',
+      estimatedMinutes: 60,
+      linkedPaperTitle: paper.title,
+      linkedPaperLink: paper.link,
+      notes: `来源：${paper.source || '未知'}｜引用：${paper.citations || 0}`,
+      subtasks: [
+        { id: Date.now(), text: '通读摘要与引言', done: false },
+        { id: Date.now() + 1, text: '提炼核心方法贡献', done: false },
+        { id: Date.now() + 2, text: '记录局限与可复现点', done: false },
+      ],
+    });
+    await addTask(`整理精读卡片：${paper.title}`, '写作', '中', {
+      view: 'week',
+      estimatedMinutes: 35,
+      linkedPaperTitle: paper.title,
+      linkedPaperLink: paper.link,
+    });
+    await addTask(`提炼可复现实验：${paper.title}`, '实验', '高', {
+      view: 'week',
+      estimatedMinutes: 90,
+      linkedPaperTitle: paper.title,
+      linkedPaperLink: paper.link,
+      notes: '关注数据集、指标、消融实验与潜在复现成本。',
+    });
   };
 
   const openReader = (paper: Paper) => {
+    const link = paper.link || paper.pdfUrl || paper.title || '';
+    if (!link) return;
+
+    if (!link.startsWith('blob:')) {
+      const params = new URLSearchParams();
+      params.set('link', link);
+      params.set('title', paper.title || '未命名论文');
+      if (paper.authors) params.set('authors', paper.authors);
+      if (paper.source) params.set('source', paper.source);
+      if (paper.pdfUrl) params.set('pdfUrl', paper.pdfUrl);
+      if (paper.summary) params.set('summary', paper.summary);
+      if (paper.status) params.set('status', paper.status);
+      if (paper.priority) params.set('priority', paper.priority);
+      router.push(`/reader?${params.toString()}`);
+      return;
+    }
+
     sessionStorage.setItem('nexus_reading_paper', JSON.stringify({ ...paper, pdfUrl: getPdfUrl(paper) }));
     router.push('/reader');
   };
@@ -362,6 +436,7 @@ const ScholarHub = () => {
             <p>顶刊精读 · 前沿扫描 · 综述导航</p>
           </div>
         </div>
+        <Link href="/intelligence" className="intel-nav-link"><Lightbulb size={18} /> 情报中心</Link>
         <div className="tab-switcher">
           <button className={activeTab === 'DISCOVER' ? 'active' : ''} onClick={() => setActiveTab('DISCOVER')}>方向雷达</button>
           <button className={activeTab === 'LIBRARY' ? 'active' : ''} onClick={() => setActiveTab('LIBRARY')}>我的精读库 ({library.length})</button>
@@ -404,6 +479,17 @@ const ScholarHub = () => {
               <Search size={20} color="#94a3b8" />
               <input placeholder="在当前方向内搜索题目、作者、期刊..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
             </div>
+            <div className="discover-filters">
+              <select value={yearFilter} onChange={e => setYearFilter(e.target.value)}>
+                {['全部', '近1年', '近3年', '2021后'].map(item => <option key={item}>{item}</option>)}
+              </select>
+              <select value={qualityFilter} onChange={e => setQualityFilter(e.target.value)}>
+                {['全部', '顶刊/顶会', '高引用', '可读PDF', '综述'].map(item => <option key={item}>{item}</option>)}
+              </select>
+              <select value={sortMode} onChange={e => setSortMode(e.target.value as '最新' | '高引' | '精读优先')}>
+                {['精读优先', '高引', '最新'].map(item => <option key={item}>{item}</option>)}
+              </select>
+            </div>
             {loading ? (
               <div className="loading-placeholder"><Loader2 className="animate-spin" size={34} /> 正在扫描权威论文源...</div>
             ) : (
@@ -423,7 +509,8 @@ const ScholarHub = () => {
                       {paper.summary && <p className="paper-abstract">{paper.summary.slice(0, 240)}...</p>}
                       <div className="p-btns">
                         <button className="p-btn-dark" onClick={() => openReader(paper)}><Maximize2 size={16} /> 深度阅读</button>
-                        <button className="p-btn-light" onClick={() => addToLibrary(paper)}><Bookmark size={16} /> 加入精读库</button>
+                        <button className="p-btn-light" onClick={() => addToLibrary({ ...paper, status: '未读', tags: ['待精读', domain.label], priority: paper.priority || '高' })}><Bookmark size={16} /> 加入精读库</button>
+                        <button className="p-btn-light secondary" onClick={() => createPaperTasks(paper)}><Sparkles size={16} /> 加入精读队列</button>
                         <a className="p-link" href={paper.link} target="_blank" rel="noreferrer"><ExternalLink size={15} /> 来源</a>
                       </div>
                     </div>
@@ -487,7 +574,11 @@ const ScholarHub = () => {
               <span className="eyebrow"><BookOpen size={14} /> Personal Reading Vault</span>
               <h2>已存精读文献 ({library.length})</h2>
             </div>
-            <button className="import-btn" onClick={() => fileInputRef.current?.click()}><Upload size={18} /> 导入本地 PDF</button>
+            {!isSupabaseConfigured ? (
+              <button className="import-btn" onClick={() => fileInputRef.current?.click()}><Upload size={18} /> 导入本地 PDF</button>
+            ) : (
+              <div className="cloud-hint">已启用云端模式，本地 PDF 导入暂不保存到云端。</div>
+            )}
           </div>
           <div className="library-filters">
             {['全部', '未读', '在读', '已读', '已复现', '高', '综述', '方法', '应用'].map(item => (
@@ -545,6 +636,8 @@ const ScholarHub = () => {
         .tab-switcher { background: #eef2f7; padding: 0.4rem; border-radius: 18px; display: flex; gap: 0.35rem; }
         .tab-switcher button { border: none; background: transparent; padding: 0.8rem 1.45rem; font-weight: 800; cursor: pointer; border-radius: 14px; color: #64748b; }
         .tab-switcher button.active { background: #fff; color: #0f172a; box-shadow: 0 12px 28px rgba(15,23,42,0.08); }
+        .intel-nav-link { display: inline-flex; align-items: center; gap: 0.6rem; border: none; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border-radius: 16px; padding: 0.9rem 1.4rem; font-weight: 900; text-decoration: none; cursor: pointer; transition: all 0.2s; }
+        .intel-nav-link:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(16, 185, 129, 0.3); }
 
         .domain-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.6rem; }
         .domain-card { text-align: left; border: 1px solid #e2e8f0; background: linear-gradient(180deg, #fff, #f8fafc); border-radius: 24px; padding: 1.35rem; cursor: pointer; transition: all .25s; display: grid; gap: .55rem; }
@@ -567,6 +660,8 @@ const ScholarHub = () => {
         .sync-meta button.on { background: #111827; color: #fff; border-color: #111827; }
         .search-input-wrap { display: flex; align-items: center; gap: 1rem; padding: 0 1.1rem; border-radius: 18px; background: #f8fafc; border: 1px solid #e2e8f0; margin-bottom: 1rem; }
         .search-input-wrap input { width: 100%; height: 54px; border: none; outline: none; background: transparent; font-size: 1rem; font-weight: 700; }
+        .discover-filters { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .discover-filters select { border: 1px solid #e2e8f0; background: #fff; border-radius: 14px; padding: .8rem .95rem; font-weight: 800; color: #334155; outline: none; }
         .loading-placeholder { min-height: 320px; display: flex; align-items: center; justify-content: center; gap: .8rem; color: #64748b; font-weight: 900; }
 
         .paper-stack { display: grid; gap: 1rem; }
@@ -586,6 +681,7 @@ const ScholarHub = () => {
         .p-btn-dark, .p-btn-light, .p-link { border: none; text-decoration: none; padding: .75rem 1rem; border-radius: 14px; font-weight: 900; cursor: pointer; display: inline-flex; align-items: center; gap: .55rem; }
         .p-btn-dark { background: #0f172a; color: #fff; }
         .p-btn-light { background: #eef2ff; color: #3730a3; }
+        .p-btn-light.secondary { background: #ecfeff; color: #0f766e; }
         .p-link { color: #475569; background: #f8fafc; }
 
         .insight-rail { display: grid; gap: 1rem; position: sticky; top: 1rem; }
